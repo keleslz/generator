@@ -1,7 +1,20 @@
-# Recuperer une page web
+# Site generator based on WordPress site
 
-Recuperer une page d'accueil
+## src
 
-# Attributes.json
+### files
 
-Générer ce fichier qui contiendra le nombre de liens et toute les données dynamique injectable par le back
+    website-identifier
+        attributes
+            page-1-attributes.json
+            page-2-attributes.json
+        pages
+            page-1.html.mustache
+            page-2.html.mustache
+        styles
+            generated.css
+
+### libs
+
+    dom
+    services

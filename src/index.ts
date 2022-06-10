@@ -1,62 +1,60 @@
-import https from 'https'
 import fs from 'fs'
 import express from 'express'
-import { DomFormat } from './libs/dom/DomFormat'
-import * as cheerio from 'cheerio'
-import { LinkService } from './libs/LinkService'
+import path from 'path'
+import Mustache from 'mustache'
+import { FileService } from './libs/services/FileService'
+import { Attribute } from './libs/services/AttributesService'
+import { ServiceFactory } from './libs/factory/ServiceFactory'
 
 const app = express()
 const port = 3000
-const src = "src/files"
-const options: https.RequestOptions = {
-    hostname: 'wordpress.com',
-    port: 443,
-    path: '/',
-    method: 'GET',
-    headers: {
-        'user-agent': 'user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.5005.63 Safari/537.36'
-    }
-}
 
-type LinksAttributes = {
-    index: Number,
-    id: Number,
-}
+const domainName = 'wordpress.com'
 
-// Listen all save 
 app.listen(port, () => {
-    const content = fs.readFileSync(`${src}/test/test.html.twig`, 'utf-8');
-    const document = cheerio.load(content);
-    const attributes = new Map<number, LinksAttributes>();
-    
-    const manager = new DomFormat(document);
-    manager.removeScripts()
-    manager.head()
-    manager.links()
 
-    fs.writeFileSync(`${src}/test/generated.html.twig`, document.html().toString(), {
-        encoding: 'utf-8'
-    })
-
-    // const dir = fs.mkdirSync(`${src}/${options.hostname}`)
-
-    // const req = https.request(options, (res) => {
-    //     console.log(`statusCode: ${res.statusCode}`)
-
-    //     let data =''
-    //     res.on('data', (line) => {      
-    //         data += line
-    //     });
-
-    //     res.on('end', () => {
-    //         // const content = new DomManager(data).remove()
-    //         fs.writeFile(`${src}/${options.hostname}/test.html.twig`, data, console.error)
-    //     });
-    // })
-
-    // req.on('error', (e) => {
-    //     console.log(e);
-    // })
-
-    // req.end()
 })
+
+app.get('/generate', (req, res) => {
+
+    const content = fs.readFileSync('src/files/wordpress.org/pages/index.html.mustache', { encoding: 'utf-8'})
+
+    ServiceFactory.getFormatPageService(domainName).execute(
+        content, 
+        'src/files/wordpress.org/pages/index.html.mustache',
+        1
+    )
+
+    ServiceFactory.getUploadService(
+        domainName,
+        (content, path) => ServiceFactory.getFormatPageService(domainName).execute(content, path, 1)
+    ).execute()
+
+    res.send("{'status': 'ok'}");
+
+})
+
+app.get('/index', (req, res) => {
+    
+    const base = path.join('src', 'files', domainName)
+    const project = path.join(base, 'pages', 'index.html.mustache')
+    const atttributeFilePath = path.join(base, 'attributes', 'attributes-1.json')
+    const content = FileService.read(project)
+
+    const json = JSON.parse(FileService.read(atttributeFilePath))
+    const entries = Object.entries<Attribute>(json);
+
+    const lorem = FileService.read(path.join('src', 'assets', 'lorem-ipsum.txt' ))
+    let data = new Map<String, string>()
+
+    for (const [k] of entries) {
+        const value =  Math.floor(Math.random() * 100);
+        data.set(k, lorem.slice(4, value))
+    }
+
+    console.log(Object.fromEntries(data));
+    
+    let output = Mustache.render(content, Object.fromEntries(data));
+
+    res.send(output);
+});
